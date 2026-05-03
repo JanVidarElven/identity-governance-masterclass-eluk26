@@ -2,6 +2,10 @@
 
 This repository contains labs and resources for attendees at Identity Governance Master Class, Experts Live UK 2026.
 
+## Agenda
+
+Look at the [Agenda](Agenda.md) for details on timings for the Identity Governance Master Class at Experts Live UK 2026.
+
 ## Labs
 
 Check the [Lab Instructions](labs/Readme.md) to prepare for the Identity Governance Master Class at Experts Live UK 2026.
