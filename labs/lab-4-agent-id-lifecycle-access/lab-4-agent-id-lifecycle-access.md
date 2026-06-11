@@ -16,53 +16,169 @@ In this lab you will explore how you can create the different building blocks of
 
 ### Option 2: Create an Agent Blueprint with Microsoft Graph (Graph Explorer)
 
+First we create the Agent Blueprint:
+
 **Resource URI**
 
-`POST https://graph.microsoft.com/beta/identity/agentId/blueprints`
+`POST https://graph.microsoft.com/v1.0/applications/`
 
 **Sample request body**  
 > Update property values to match your tenant and the latest beta schema.
 
 ```json
 {
-    "displayName": "Contoso Support Agent Blueprint",
-    "description": "Blueprint for support automation agents",
-    "category": "operations",
-    "owners": [
+  "@odata.type": "Microsoft.Graph.AgentIdentityBlueprint",
+  "displayName": "My Agent Identity Blueprint",
+  "sponsors@odata.bind": [
+    "https://graph.microsoft.com/v1.0/users/<id>"
+  ],
+  "owners@odata.bind": [
+    "https://graph.microsoft.com/v1.0/users/<id>"
+  ]
+}
+```
+
+Next we create a credential to be used for agent identity authentication:
+
+**Resource URI**
+
+`POST https://graph.microsoft.com/v1.0/applications/<agent-blueprint-id>/addPassword`
+
+**Sample request body**  
+> Update property values to match your tenant and the latest beta schema.
+
+```json
+{
+  "passwordCredential": {
+    "displayName": "My Secret",
+    "endDateTime": "2026-08-05T23:59:59Z"
+  }
+}
+```
+
+Then to be able to  receive incoming requests from users and other agents, like for any web API, you need to define an identifier URI and OAuth scope for your agent identity blueprint:
+
+**Resource URI**
+
+`PATCH https://graph.microsoft.com/v1.0/applications/<agent-blueprint-id>`
+
+**Sample request body**  
+> Update property values to match your tenant and the latest beta schema.
+
+```json
+{
+    "identifierUris": ["api://<agent-blueprint-id>"],
+    "api": {
+      "oauth2PermissionScopes": [
         {
-            "userPrincipalName": "<YOUR-OWNER-USER>@<YOUR-TENANT-DOMAIN>"
+          "adminConsentDescription": "Allow the application to access the agent on behalf of the signed-in user.",
+          "adminConsentDisplayName": "Access agent",
+          "id": "<generate-a-guid>",
+          "isEnabled": true,
+          "type": "User",
+          "value": "access_agent"
         }
-    ],
-    "sponsors": [
-        {
-            "userPrincipalName": "<YOUR-SPONSOR-USER>@<YOUR-TENANT-DOMAIN>"
-        }
-    ]
+      ]
+  }
+}
+```
+
+Last, create a service principal for the blueprint:
+
+**Resource URI**
+
+`POST https://graph.microsoft.com/v1.0/serviceprincipals/microsoft.graph.agentIdentityBlueprintPrincipal`
+
+**Sample request body**  
+> Update property values to match your tenant and the latest beta schema.
+
+```json
+{
+  "appId": "<agent-blueprint-app-id>"
 }
 ```
 
 ### Option 3: Create an Agent Blueprint with Microsoft Graph PowerShell SDK
 
+First we create the Agent Blueprint:
+
 ```azurepowershell
 # Connect with delegated permission to create Agent ID blueprints
-Connect-MgGraph -Scopes "AgentIdentityManagement.ReadWrite.All"
-Select-MgProfile -Name "beta"
 
-$uri = "https://graph.microsoft.com/beta/identity/agentId/blueprints"
+Connect-MgGraph -Scopes "AgentIdentityBlueprint.Create","User.Read" -TenantId <your-tenant-id>
+
+$currentUser = Get-MgContext | Select-Object -ExpandProperty Account
+$user = Get-MgUser -UserId $currentUser
+
+Write-Host "Current user: $($user.DisplayName) ($($user.Id))"
+Write-Host "Sponsor user: $($user.DisplayName) ($($user.Id))"
 
 $body = @{
-    displayName = "Contoso Support Agent Blueprint"
-    description = "Blueprint for support automation agents"
-    category    = "operations"
-    owners      = @(
-        @{ userPrincipalName = "<YOUR-OWNER-USER>@<YOUR-TENANT-DOMAIN>" }
-    )
-    sponsors    = @(
-        @{ userPrincipalName = "<YOUR-SPONSOR-USER>@<YOUR-TENANT-DOMAIN>" }
-    )
-} | ConvertTo-Json -Depth 10
+    "@odata.type" = "Microsoft.Graph.AgentIdentityBlueprint"
+    "displayName" = "My Agent Identity Blueprint"
+    "sponsors@odata.bind" = @("https://microsoft.graph.microsoft.com/v1.0/users/$($user.Id)")
+    "owners@odata.bind" = @("https://microsoft.graph.microsoft.com/v1.0/users/$($user.Id)")
+} | ConvertTo-Json -Depth 5
 
-Invoke-MgGraphRequest -Method POST -Uri $uri -Body $body -ContentType "application/json"
+$response = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0/applications/microsoft.graph.agentIdentityBlueprint" -Body $body -ContentType "application/json"
+
+$response
+```
+
+Next we create a credential to be used for agent identity authentication:
+
+```azurepowershell
+Connect-MgGraph -Scopes "AgentIdentityBlueprint.AddRemoveCreds.All" -TenantId <your-tenant-id>
+
+$applicationId = "<agent-blueprint-application-id>"
+
+# Define the secret properties
+$displayName = "My Secret"
+$endDate = (Get-Date).AddYears(1).ToString("o")  # 1 year from now, in ISO 8601 format
+
+# Construct the password credential
+$passwordCredential = @{
+    displayName = $displayName
+    endDateTime = $endDate
+}
+
+# Add the password (client secret)
+$response = Add-MgApplicationPassword -ApplicationId $applicationId -PasswordCredential $passwordCredential
+
+# Output the generated secret (only returned once!)
+Write-Host "Secret Text: $($response.secretText)"
+```
+
+Then to be able to  receive incoming requests from users and other agents, like for any web API, you need to define an identifier URI and OAuth scope for your agent identity blueprint:
+
+```powershell
+Connect-MgGraph -Scopes "AgentIdentityBlueprint.UpdateAuthProperties.All" -TenantId <your-tenant-id>
+
+$AppId = "<agent-blueprint-id>"
+$IdentifierUri = "api://<agent-blueprint-id>"
+$ScopeId = [guid]::NewGuid()
+
+# Construct the OAuth2 permission scope
+$scope = @{
+    adminConsentDescription = "Allow the application to access the agent on behalf of the signed-in user."
+    adminConsentDisplayName = "Access agent"
+    id = $ScopeId
+    isEnabled = $true
+    type = "User"
+    value = "access_agent"
+}
+
+Update-MgApplication -ApplicationId $AppId -IdentifierUris @($IdentifierUri) -Api @{ oauth2PermissionScopes = @($scope) }
+```
+
+Last, create a service principal for the blueprint:
+
+```azurepowershell
+Connect-MgGraph -Scopes "AgentIdentityBlueprintPrincipal.Create" -TenantId
+$body = @{
+    appId   = "<agent-blueprint-client-id>"
+}
+Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0/serviceprincipals/microsoft.graph.agentIdentityBlueprintPrincipal" -Headers @{ "OData-Version" = "4.0" } -Body ($body | ConvertTo-Json)
 ```
 
 ## Lab 4.2 - Create an Agent Identity
