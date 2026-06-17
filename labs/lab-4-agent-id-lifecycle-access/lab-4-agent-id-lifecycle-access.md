@@ -18,9 +18,20 @@ In this lab you will explore how you can create the different building blocks of
 
 First we create the Agent Blueprint:
 
+You need the following permissions (delegated):
+
+* AgentIdentityBlueprint.Create
+* AgentIdentityBlueprint.AddRemoveCreds.All
+* AgentIdentityBlueprint.UpdateAuthProperties.All
+* AgentIdentityBlueprintPrincipal.Create
+
 **Resource URI**
 
-`POST https://graph.microsoft.com/v1.0/applications/`
+`POST https://graph.microsoft.com/v1.0/applications/microsoft.graph.agentIdentityBlueprint`
+
+**Request header**
+OData-Version: 4.0
+Content-Type: application/json
 
 **Sample request body**  
 > Update property values to match your tenant and the latest beta schema.
@@ -213,19 +224,39 @@ Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0/servic
 
 ### Option 2b: Delete an Agent Identity with Microsoft Graph (Graph Explorer)
 
-
 **Resource URI**
 
 `DELETE https://graph.microsoft.com/beta/serviceprincipals/<agent-identity-id>`
 
-## Lab 4.3 - Create a CA Policy targeting Agents
+## Lab 4.3 - Create an Agent User
+
+### Option 1: Create an Agent Identity with Microsoft Graph (Graph Explorer)
+
+**Resource URI**
+
+`POST https://graph.microsoft.com/beta/users/microsoft.graph.agentUser`
+
+**Sample request body**  
+> Update property values to match your tenant and the latest beta schema.
+
+```json
+{
+  "accountEnabled": true,
+  "displayName": "My Agent User",
+  "mailNickname": "MyAgent",
+  "userPrincipalName": "myagent@contoso.com",
+  "identityParentId": "<agent-identity-id>"
+}
+```
+
+## Lab 4.4 - Create a CA Policy targeting Agents
 
 Create a simple Condititional Access Policy targeting Agent Identities and select the one you created above. Restrict allowed location.
 
-## Lab 4.4 - Create an Access Package that Agents Sponsors can request
+## Lab 4.5 - Create an Access Package that Agents Sponsors can request
 
 This can only be done if you have Entra Agent ID licenses.
 
-## Lab 4.5 - OPTIONAL (ADVANCED) - Explore Entra ID Agent Samples
+## Lab 4.6 - OPTIONAL (ADVANCED) - Explore Entra ID Agent Samples
 
 This lab is optional and for referall only if you really want to deep dive into Agent ID and Agent Building. For advanced concepts, look at the https://github.com/microsoft/entra-agentid-samples, and explore the samples there.
